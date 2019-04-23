@@ -4,9 +4,9 @@ import os
 
 import pytest
 import sqlalchemy
+from databases import Database, DatabaseURL
 
 import orm
-from databases import Database, DatabaseURL
 
 assert "TEST_DATABASE_URLS" in os.environ, "TEST_DATABASE_URLS is not set."
 
@@ -228,3 +228,38 @@ async def test_model_limit_with_filter(database_url):
         await User.objects.create(name="Tom")
 
         assert len(await User.objects.limit(2).filter(name__iexact='Tom').all()) == 2
+
+
+@pytest.mark.parametrize("database_url", DATABASE_URLS)
+@async_adapter
+async def test_model_offset(database_url):
+    async with Database(database_url, force_rollback=True) as database:
+        for model in models:
+            model.__database__ = database
+        await User.objects.create(name="Tom")
+        await User.objects.create(name="Jane")
+        await User.objects.create(name="Lucy")
+
+        result = await User.objects.offset(2).all()
+        assert len(result) == 1
+        assert result[0].name == "Lucy"
+
+
+@pytest.mark.parametrize("database_url", DATABASE_URLS)
+@async_adapter
+async def test_model_offset_with_filter(database_url):
+    async with Database(database_url, force_rollback=True) as database:
+        for model in models:
+            model.__database__ = database
+        await User.objects.create(name="Tom")
+        await User.objects.create(name="Tom")
+        await User.objects.create(name="Tom")
+        await User.objects.create(name="Jane")
+        await User.objects.create(name="Lucy")
+
+        assert len(await User.objects.offset(2).filter(name__iexact='Tom').all()) == 1
+
+        result = await User.objects.limit(2).offset(2).all()
+        assert len(result) == 2
+        assert result[0].name == "Tom"
+        assert result[1].name == "Jane"

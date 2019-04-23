@@ -5,8 +5,6 @@ import typesystem
 from typesystem.schemas import SchemaMetaclass
 
 from orm.exceptions import MultipleMatches, NoMatch
-from orm.fields import ForeignKey
-
 
 FILTER_OPERATORS = {
     "exact": "__eq__",
@@ -23,7 +21,7 @@ FILTER_OPERATORS = {
 
 class ModelMetaclass(SchemaMetaclass):
     def __new__(
-        cls: type, name: str, bases: typing.Sequence[type], attrs: dict
+            cls: type, name: str, bases: typing.Sequence[type], attrs: dict
     ) -> type:
         new_model = super(ModelMetaclass, cls).__new__(  # type: ignore
             cls, name, bases, attrs
@@ -50,11 +48,20 @@ class ModelMetaclass(SchemaMetaclass):
 
 class QuerySet:
     ESCAPE_CHARACTERS = ['%', '_']
-    def __init__(self, model_cls=None, filter_clauses=None, select_related=None, limit_count=None):
+
+    def __init__(
+            self,
+            model_cls=None,
+            filter_clauses=None,
+            select_related=None,
+            limit_count=None,
+            offset_count=None
+    ):
         self.model_cls = model_cls
         self.filter_clauses = [] if filter_clauses is None else filter_clauses
         self._select_related = [] if select_related is None else select_related
         self.limit_count = limit_count
+        self.offset_count = offset_count
 
     def __get__(self, instance, owner):
         return self.__class__(model_cls=owner)
@@ -91,6 +98,9 @@ class QuerySet:
 
         if self.limit_count:
             expr = expr.limit(self.limit_count)
+
+        if self.offset_count:
+            expr = expr.offset(self.offset_count)
 
         return expr
 
@@ -156,7 +166,8 @@ class QuerySet:
             model_cls=self.model_cls,
             filter_clauses=filter_clauses,
             select_related=select_related,
-            limit_count=self.limit_count
+            limit_count=self.limit_count,
+            offset_count=self.offset_count
         )
 
     def select_related(self, related):
@@ -168,7 +179,8 @@ class QuerySet:
             model_cls=self.model_cls,
             filter_clauses=self.filter_clauses,
             select_related=related,
-            limit_count=self.limit_count
+            limit_count=self.limit_count,
+            offset_count=self.offset_count
         )
 
     async def exists(self) -> bool:
@@ -181,7 +193,17 @@ class QuerySet:
             model_cls=self.model_cls,
             filter_clauses=self.filter_clauses,
             select_related=self._select_related,
-            limit_count=limit_count
+            limit_count=limit_count,
+            offset_count=self.offset_count
+        )
+
+    def offset(self, offset_count: int):
+        return self.__class__(
+            model_cls=self.model_cls,
+            filter_clauses=self.filter_clauses,
+            select_related=self._select_related,
+            limit_count=self.limit_count,
+            offset_count=offset_count
         )
 
     async def count(self) -> int:
